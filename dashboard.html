@@ -1,0 +1,871 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Cracking Suite — Full Edition</title>
+<style>
+:root{
+  --bg:#030403; --neon:#00ff7f; --dim:#07320f; --accent:#00ffd6; --muted:rgba(0,255,127,0.18);
+  --font: "Consolas","Monaco", monospace;
+}
+html,body{height:100%;margin:0;background:linear-gradient(180deg,#001100, #000); color:var(--neon); font-family:var(--font); overflow:hidden;}
+.container{display:grid; grid-template-columns: 560px 1fr 360px; gap:12px; padding:18px; height:calc(100% - 36px);}
+.panel{background:rgba(0,0,0,0.35); border:1px solid rgba(0,255,127,0.06); border-radius:10px; padding:12px; box-shadow: 0 20px 60px rgba(0,255,127,0.02) inset;}
+.header{grid-column:1 / -1; display:flex; align-items:center; gap:12px; margin-bottom:6px;}
+.title{font-size:18px; font-weight:800; text-shadow:0 0 10px rgba(0,255,127,0.06);}
+.small{font-size:12px; color:var(--muted);}
+.leftCol{display:flex; flex-direction:column; height:100%;}
+.controls{display:flex; gap:8px; margin-bottom:8px;}
+.btn{background:transparent; border:1px solid rgba(0,255,127,0.12); padding:10px 14px; border-radius:8px; cursor:pointer; color:var(--neon); font-weight:700;}
+.btn.primary{background:linear-gradient(90deg, rgba(0,255,127,0.06), rgba(0,255,127,0.02)); box-shadow:0 6px 20px rgba(0,255,127,0.02);}
+.sectionTitle{font-size:13px; color:var(--neon); margin:6px 0;}
+.input, select, textarea{background:#041204; border:1px solid rgba(0,255,127,0.04); color:var(--neon); padding:8px; border-radius:6px; width:100%;}
+.row{display:flex; gap:8px;}
+.smallNote{font-size:11px; color:var(--muted);}
+.terminal{background:#001100; padding:8px; border-radius:6px; height:260px; overflow:auto; font-size:13px; line-height:1.3; border:1px solid rgba(0,255,127,0.04);}
+.statBox{background:linear-gradient(90deg, rgba(0,255,127,0.02), rgba(0,255,127,0.01)); border:1px solid rgba(0,255,127,0.04); padding:10px; border-radius:8px; text-align:center;}
+.gridStats{display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-bottom:8px;}
+.progressBar{height:12px; background:rgba(0,0,0,0.2); border-radius:8px; overflow:hidden;}
+.progressBar > i{display:block; height:100%; width:0%; background:linear-gradient(90deg,#00ff7f,#00ffd6); box-shadow:0 6px 30px rgba(0,255,127,0.04); transition:width .08s linear;}
+.footer{position:fixed; right:18px; bottom:12px; color:var(--muted); font-size:12px;}
+.leftControls{margin-bottom:6px;}
+.fileDrop{border:1px dashed rgba(0,255,127,0.06); padding:8px; border-radius:6px; text-align:center; color:var(--muted);}
+
+/* Styled file chooser button inside the fileDrop */
+.fileDrop .fileBtn{display:inline-block; margin-left:8px; background:transparent; border:1px solid rgba(0,255,127,0.12); padding:8px 12px; border-radius:8px; color:var(--neon); cursor:pointer; font-weight:700;}
+.fileDrop .fileBtn input[type="file"]{display:none}
+.fileDrop .fileName{display:inline-block; margin-left:12px; color:var(--muted); font-size:12px; vertical-align:middle}
+
+/* Custom scrollbars for modern browsers */
+.terminal::-webkit-scrollbar{width:14px}
+.terminal::-webkit-scrollbar-track{background:transparent}
+.terminal::-webkit-scrollbar-thumb{background:linear-gradient(180deg, rgba(0,255,127,0.06), rgba(0,255,127,0.02)); border-radius:8px; border:3px solid rgba(0,17,0,0.65)}
+.panel::-webkit-scrollbar{width:10px}
+.panel::-webkit-scrollbar-thumb{background:rgba(0,255,127,0.04); border-radius:6px}
+
+kbd {background:#021202; border:1px solid rgba(0,255,127,0.04); padding:6px 8px; border-radius:6px; color:var(--neon); font-weight:700;}
+
+</style>
+</head>
+<body>
+
+<div class="header" style="padding:12px 18px;">
+  <div class="title">Cracking Suite — Full Edition</div>
+  <div style="flex:1"></div>
+  <div class="small">Local-only. Educational demo.</div>
+  <button id="connectSerial" class="btn" style="margin-left:12px;">CONNECT ARDUINO (optional)</button>
+</div>
+
+<div class="container">
+
+  <!-- LEFT: Attack configuration -->
+  <div class="panel leftCol">
+    <div class="sectionTitle">Attack Type</div>
+    <div class="controls leftControls">
+      <select id="attackMode" class="input" style="width:100%;">
+        <option value="brute">Brute Force</option>
+        <option value="mask">Mask Attack</option>
+        <option value="dict">Dictionary</option>
+        <option value="hybrid">Hybrid: Mask + Dictionary</option>
+        <option value="hash">Hash Crack (MD5/CRC32)</option>
+      </select>
+    </div>
+
+    <div class="sectionTitle">Charset Builder</div>
+    <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-bottom:8px;">
+      <button class="btn" id="addDigits">Add 0-9</button>
+      <button class="btn" id="addLower">Add a-z</button>
+      <button class="btn" id="addUpper">Add A-Z</button>
+      <button class="btn" id="addPunct">Add Symbols</button>
+    </div>
+    <div style="margin-bottom:8px;">
+      <input id="charsetInput" class="input" placeholder="Custom charset: characters here" />
+      <div class="smallNote">Charset is used for brute/mask generation. Remove duplicates if needed.</div>
+    </div>
+
+    <div class="sectionTitle">Mask / Brute Settings</div>
+    <div style="margin-bottom:8px;">
+      <input id="maskInput" class="input" placeholder="Mask: e.g. ?u?u?d?d or P@ss?d?d" />
+      <div class="smallNote">Mask placeholders: ?d=digits, ?l=lower, ?u=upper, ?s=symbols, ?a=all, ?c=custom (see charset)</div>
+    </div>
+    <div style="display:flex; gap:8px; margin-bottom:8px;">
+      <input id="minLen" class="input" placeholder="Min length" style="width:110px;" />
+      <input id="maxLen" class="input" placeholder="Max length" style="width:110px;" />
+      <input id="workers" class="input" placeholder="Workers (sim)" style="width:120px;" />
+    </div>
+
+    <div class="sectionTitle">Dictionary</div>
+    <div style="margin-bottom:8px;">
+      <div class="fileDrop" id="fileDrop">Drop wordlist (.txt) here or <label class="fileBtn">Choose File<input type="file" id="dictFile" /></label><span class="fileName" id="fileName">No file chosen</span></div>
+      <div class="smallNote">File parsed locally. Each line = one password candidate.</div>
+    </div>
+
+    <div class="sectionTitle">Hash Settings (for Hash Cracking)</div>
+    <div style="display:flex; gap:8px;">
+      <select id="hashType" class="input" style="width:140px;">
+        <option value="plain">Plain-text compare</option>
+        <option value="md5">MD5</option>
+        <option value="crc32">CRC32</option>
+      </select>
+      <input id="targetHash" class="input" placeholder="Target hash (or plaintext if plain)" />
+    </div>
+
+    <div style="margin-top:12px; display:flex; gap:8px;">
+      <button id="startBtn" class="btn primary">START</button>
+      <button id="stopBtn" class="btn">STOP</button>
+      <button id="pauseBtn" class="btn">PAUSE</button>
+    </div>
+
+    <div style="margin-top:12px; display:flex; gap:8px;">
+      <button id="savePreset" class="btn">Save Preset</button>
+      <button id="loadPreset" class="btn">Load Preset</button>
+      <button id="exportLog" class="btn">Export Log</button>
+    </div>
+
+    <div style="margin-top:12px;">
+      <div class="sectionTitle">Quick Controls</div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn" id="faster">Faster (reduce delay)</button>
+        <button class="btn" id="slower">Slower (increase delay)</button>
+      </div>
+    </div>
+
+    <div style="margin-top:auto; font-size:12px;" class="smallNote">
+      Tips: Use small charsets and lengths for live demos. For hashing demos, MD5 is fast in browser; CRC32 is shown for educational purposes.
+    </div>
+  </div>
+
+  <!-- MIDDLE: Terminal / Graph / Live -->
+  <div class="panel" style="display:flex; flex-direction:column;">
+    <div style="display:flex; gap:12px; align-items:center; margin-bottom:8px;">
+      <div style="flex:1;"><div class="sectionTitle">Live Terminal</div></div>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <div class="smallNote">Attempts: <span id="statAttempts">0</span></div>
+        <div class="smallNote">Speed: <span id="statSpeed">0.0</span>/s</div>
+        <div class="smallNote">Elapsed: <span id="statElapsed">0.0</span>s</div>
+      </div>
+    </div>
+
+    <div class="terminal" id="terminal">
+      <div class="logline">[system] Ready. Configure attack and press START.</div>
+    </div>
+
+    <div style="display:flex; gap:12px; margin-top:12px; align-items:center;">
+      <div style="flex:1;">
+        <div class="sectionTitle">Attempts/sec (graph)</div>
+        <canvas id="rateChart" style="width:100%; height:140px; background:#001100; border-radius:8px;"></canvas>
+      </div>
+      <div style="width:220px;">
+        <div class="sectionTitle">Progress</div>
+        <div class="statBox" id="foundBox">Status: IDLE</div>
+        <div style="margin-top:8px;" class="progressBar"><i id="mainProg"></i></div>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <div style="flex:1" class="smallNote">ETA: <span id="eta">—</span></div>
+          <div style="width:80px;" class="smallNote">Mode: <span id="modeLabel">—</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Advanced controls + Arduino mirror -->
+  <div class="panel">
+    <div class="sectionTitle">Advanced</div>
+    <div style="margin-bottom:8px;">
+      <label class="smallNote">Delay per attempt (ms)</label>
+      <input id="delayMs" class="input" placeholder="e.g., 2" value="2" />
+    </div>
+
+    <div style="margin-bottom:8px;">
+      <label class="smallNote">Stop after N attempts (0 = infinite)</label>
+      <input id="stopAfter" class="input" placeholder="0" value="0"/>
+    </div>
+
+    <div style="margin-top:12px;" class="sectionTitle">Arduino Mirror (optional)</div>
+    <div style="display:flex; flex-direction:column; gap:8px;">
+      <div class="smallNote">Mirror local attempts to Arduino serial (one line per attempt). Arduino will not be used for cracking — only visualization.</div>
+      <button id="serialToggle" class="btn">OPEN SERIAL</button>
+      <div class="smallNote">Mirror options:</div>
+      <label><input type="checkbox" id="mirrorAttempts" checked/> Mirror attempts</label>
+      <label><input type="checkbox" id="mirrorFound" checked/> Mirror found event</label>
+    </div>
+
+    <div style="margin-top:12px;">
+      <div class="sectionTitle">Voice Assist</div>
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="voiceToggle"/> Enable voice assist</label>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <div style="width:120px;">Verbosity:</div>
+          <select id="voiceLevel" class="input" style="width:160px;">
+            <option value="minimal">Minimal (status only)</option>
+            <option value="verbose">Verbose (occasional updates)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:12px;">
+      <div class="sectionTitle">Presets</div>
+      <select id="presetSelect" class="input"></select>
+      <div style="display:flex; gap:8px; margin-top:8px;">
+        <button id="loadPresetBtn" class="btn">Load</button>
+        <button id="delPresetBtn" class="btn">Delete</button>
+      </div>
+    </div>
+
+    <div style="margin-top:12px;">
+      <div class="sectionTitle">Utilities</div>
+      <button id="clearLog" class="btn">Clear Terminal</button>
+      <button id="resetUi" class="btn">Reset UI</button>
+    </div>
+
+  </div>
+
+</div>
+
+<div class="footer">Cracking Suite — All cracking is local & educational. Do not attack real systems.</div>
+
+<script>
+/* Cracking Suite — Full Edition
+   - Local engine in browser (fast)
+   - Optional serial mirror (Web Serial)
+   - Supports brute, mask, dict, hybrid, hash (MD5/CRC32)
+   - Pretty UI + graph + presets
+*/
+
+// ---- Utilities ----
+function el(id){ return document.getElementById(id); }
+function now(){ return Date.now(); }
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+function uniqChars(s){ return Array.from(new Set(s.split(''))).join(''); }
+
+// simple CRC32 for browser
+function crc32(str) {
+  const table = (function() {
+    let t=[]; for (let i=0;i<256;i++){
+      let r=i; for (let j=0;j<8;j++) r=(r&1)?(0xEDB88320^ (r>>>1)):(r>>>1); t[i]=r;
+    } return t;
+  })();
+  let crc = 0xFFFFFFFF;
+  for (let i=0;i<str.length;i++){
+    crc = (crc >>> 8) ^ table[(crc ^ str.charCodeAt(i)) & 0xFF];
+  }
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+
+// compact MD5 (minimal) — small implementation
+// Source: adapted tiny MD5 implementation for browser demos
+function md5cycle(x, k) {
+  var a = x[0], b = x[1], c = x[2], d = x[3];
+  function ff(a,b,c,d,x,s,t){a=a+(b&c|~b&d)+x+t;return ((a<<s)|(a>>> (32-s)))+b;}
+  function gg(a,b,c,d,x,s,t){a=a+(b&d|c&~d)+x+t;return ((a<<s)|(a>>> (32-s)))+b;}
+  function hh(a,b,c,d,x,s,t){a=a+(b^c^d)+x+t;return ((a<<s)|(a>>> (32-s)))+b;}
+  function ii(a,b,c,d,x,s,t){a=a+(c^(b|~d))+x+t;return ((a<<s)|(a>>> (32-s)))+b;}
+  a = ff(a,b,c,d, k[0], 7, -680876936);
+  a = ff(a,b,c,d, k[1], 12, -389564586);
+  a = ff(a,b,c,d, k[2], 17, 606105819);
+  a = ff(a,b,c,d, k[3], 22, -1044525330);
+  a = ff(a,b,c,d, k[4], 7, -176418897);
+  a = ff(a,b,c,d, k[5], 12, 1200080426);
+  a = ff(a,b,c,d, k[6], 17, -1473231341);
+  a = ff(a,b,c,d, k[7], 22, -45705983);
+  a = ff(a,b,c,d, k[8], 7, 1770035416);
+  a = ff(a,b,c,d, k[9], 12, -1958414417);
+  a = ff(a,b,c,d, k[10], 17, -42063);
+  a = ff(a,b,c,d, k[11], 22, -1990404162);
+  a = ff(a,b,c,d, k[12], 7, 1804603682);
+  a = ff(a,b,c,d, k[13], 12, -40341101);
+  a = ff(a,b,c,d, k[14], 17, -1502002290);
+  a = ff(a,b,c,d, k[15], 22, 1236535329);
+
+  a = gg(a,b,c,d, k[1], 5, -165796510);
+  a = gg(a,b,c,d, k[6], 9, -1069501632);
+  a = gg(a,b,c,d, k[11], 14, 643717713);
+  a = gg(a,b,c,d, k[0], 20, -373897302);
+  a = gg(a,b,c,d, k[5], 5, -701558691);
+  a = gg(a,b,c,d, k[10], 9, 38016083);
+  a = gg(a,b,c,d, k[15], 14, -660478335);
+  a = gg(a,b,c,d, k[4], 20, -405537848);
+  a = gg(a,b,c,d, k[9], 5, 568446438);
+  a = gg(a,b,c,d, k[14], 9, -1019803690);
+  a = gg(a,b,c,d, k[3], 14, -187363961);
+  a = gg(a,b,c,d, k[8], 20, 1163531501);
+  a = gg(a,b,c,d, k[13], 5, -1444681467);
+  a = gg(a,b,c,d, k[2], 9, -51403784);
+  a = gg(a,b,c,d, k[7], 14, 1735328473);
+  a = gg(a,b,c,d, k[12], 20, -1926607734);
+
+  a = hh(a,b,c,d, k[5], 4, -378558);
+  a = hh(a,b,c,d, k[8], 11, -2022574463);
+  a = hh(a,b,c,d, k[11], 16, 1839030562);
+  a = hh(a,b,c,d, k[14], 23, -35309556);
+  a = hh(a,b,c,d, k[1], 4, -1530992060);
+  a = hh(a,b,c,d, k[4], 11, 1272893353);
+  a = hh(a,b,c,d, k[7], 16, -155497632);
+  a = hh(a,b,c,d, k[10], 23, -1094730640);
+  a = hh(a,b,c,d, k[13], 4, 681279174);
+  a = hh(a,b,c,d, k[0], 11, -358537222);
+  a = hh(a,b,c,d, k[3], 16, -722521979);
+  a = hh(a,b,c,d, k[6], 23, 76029189);
+  a = hh(a,b,c,d, k[9], 4, -640364487);
+  a = hh(a,b,c,d, k[12], 11, -421815835);
+  a = hh(a,b,c,d, k[15], 16, 530742520);
+  a = hh(a,b,c,d, k[2], 23, -995338651);
+
+  a = ii(a,b,c,d, k[0], 6, -198630844);
+  a = ii(a,b,c,d, k[7], 10, 1126891415);
+  a = ii(a,b,c,d, k[14], 15, -1416354905);
+  a = ii(a,b,c,d, k[5], 21, -57434055);
+  a = ii(a,b,c,d, k[12], 6, 1700485571);
+  a = ii(a,b,c,d, k[3], 10, -1894986606);
+  a = ii(a,b,c,d, k[10], 15, -1051523);
+  a = ii(a,b,c,d, k[1], 21, -2054922799);
+  a = ii(a,b,c,d, k[8], 6, 1873313359);
+  a = ii(a,b,c,d, k[15], 10, -30611744);
+  a = ii(a,b,c,d, k[6], 15, -1560198380);
+  a = ii(a,b,c,d, k[13], 21, 1309151649);
+  a = ii(a,b,c,d, k[4], 6, -145523070);
+  a = ii(a,b,c,d, k[11], 10, -1120210379);
+  a = ii(a,b,c,d, k[2], 15, 718787259);
+  a = ii(a,b,c,d, k[9], 21, -343485551);
+  x[0] = (x[0] + a) | 0; x[1] = (x[1] + b) | 0; x[2] = (x[2] + c) | 0; x[3] = (x[3] + d) | 0;
+}
+function md5(s){
+  function toWords(s){ var n = s.length, words=[], i; for(i=0;i<n;i+=4) words.push((s.charCodeAt(i)) | (s.charCodeAt(i+1)<<8) | (s.charCodeAt(i+2)<<16) | (s.charCodeAt(i+3)<<24)); return words; }
+  function str2blks_MD5(str){ var n = ((str.length + 8) >> 6) + 1, blks = new Array(n*16).fill(0); for (var i=0;i<str.length;i++) blks[i>>2] |= str.charCodeAt(i) << ((i%4)*8); blks[i>>2] |= 0x80 << ((i%4)*8); blks[blks.length-2] = str.length<<3; return blks; }
+  var x = str2blks_MD5(s), i, a=1732584193,b=-271733879,c=-1732584194,d=271733878;
+  for(i=0;i<x.length;i+=16){
+    var olda=a, oldb=b, oldc=c, oldd=d;
+    md5cycle([a,b,c,d], x.slice(i,i+16));
+    a = a + olda | 0; b = b + oldb | 0; c = c + oldc | 0; d = d + oldd | 0;
+  }
+  function rhex(n){ var s='', j; for(j=0;j<4;j++) s += ('0' + ((n >> (j*8)) & 0xFF).toString(16)).slice(-2); return s; }
+  return rhex(a) + rhex(b) + rhex(c) + rhex(d);
+}
+
+// ---- UI elements ----
+const terminal = el('terminal');
+const statAttempts = el('statAttempts');
+const statSpeed = el('statSpeed');
+const statElapsed = el('statElapsed');
+const rateCanvas = el('rateChart');
+const rateCtx = rateCanvas.getContext('2d');
+const mainProg = el('mainProg');
+const foundBox = el('foundBox');
+const modeLabel = el('modeLabel');
+const etaEl = el('eta');
+
+let running = false;
+let paused = false;
+let attempts = 0;
+let startTs = 0;
+let lastUpdate = Date.now();
+let rateSamples = [];
+const RATE_MAX = 120;
+let totalTarget = 0; // if known
+let attemptDelay = parseInt(el('delayMs').value) || 2;
+let stopAfter = parseInt(el('stopAfter').value) || 0;
+let mirrorEnabled = false;
+let serialPort = null, serialWriter = null, serialOpen = false;
+let mirrorAttempts = el('mirrorAttempts').checked;
+let mirrorFound = el('mirrorFound').checked;
+
+/* Serial (Web Serial) helper functions */
+async function serialOpenPort(){
+  if (!('serial' in navigator)) { log("[serial] Web Serial not supported in this browser."); return; }
+  try {
+    serialPort = await navigator.serial.requestPort();
+    await serialPort.open({ baudRate: 115200 });
+    serialWriter = serialPort.writable.getWriter();
+    serialOpen = true;
+    el('serialToggle').innerText = 'CLOSE SERIAL';
+    log('[serial] Port opened.');
+  } catch (e) { log('[serial] Open failed: ' + e); serialOpen = false; }
+}
+async function serialClosePort(){
+  try {
+    if (serialWriter) { await serialWriter.close(); serialWriter = null; }
+    if (serialPort) { await serialPort.close(); serialPort = null; }
+    serialOpen = false; el('serialToggle').innerText = 'OPEN SERIAL';
+    log('[serial] Port closed.');
+  } catch(e){ log('[serial] Close failed: '+e); }
+}
+async function serialSendLine(line){
+  if (!serialOpen || !serialWriter) return;
+  const data = new TextEncoder().encode(line + '\n');
+  try { await serialWriter.write(data); } catch(e){ log('[serial] send failed: '+e); }
+}
+
+/* UI helpers */
+function log(s){ const d=document.createElement('div'); d.className='logline'; d.innerText = '['+new Date().toLocaleTimeString()+'] '+s; terminal.appendChild(d); terminal.scrollTop = terminal.scrollHeight; }
+function updateStats(){ statAttempts.innerText = attempts; const elapsed=(Date.now()-startTs)/1000; statElapsed.innerText = elapsed.toFixed(1); const rate = rateSamples.length? (rateSamples.reduce((a,b)=>a+b,0)/rateSamples.length):0; statSpeed.innerText = rate.toFixed(1); drawRate(); }
+function drawRate(){
+  const w=rateCanvas.width = rateCanvas.clientWidth*devicePixelRatio; const h=rateCanvas.height = rateCanvas.clientHeight*devicePixelRatio;
+  rateCtx.clearRect(0,0,w,h);
+  rateCtx.fillStyle='rgba(0,0,0,0.12)'; rateCtx.fillRect(0,0,w,h);
+  const max = Math.max(1, ...rateSamples, 5);
+  rateCtx.beginPath();
+  for (let i = 0; i < rateSamples.length; i++) {
+    const x = (i / (RATE_MAX - 1)) * w;
+    const y = h - (rateSamples[i] / max) * (h - 8) - 4;
+    if (i === 0) rateCtx.moveTo(x, y);
+    else rateCtx.lineTo(x, y);
+  }
+  rateCtx.strokeStyle='rgba(0,255,127,0.95)'; rateCtx.lineWidth=2*devicePixelRatio; rateCtx.stroke();
+}
+
+// sample rate per second
+setInterval(()=>{
+  const now=Date.now();
+  const sec = (now - lastUpdate)/1000;
+  lastUpdate = now;
+  // push last-second count trend
+  // simple: number of attempts in the last ~1s (we approximate by checking diff)
+  // We'll use attempts delta observed by external code rather than exact per-second bucket.
+  const delta = attempts - (rateSamples._lastAttempts||0);
+  rateSamples._lastAttempts = attempts;
+  rateSamples.push(Math.max(0, delta));
+  if(rateSamples.length>RATE_MAX) rateSamples.shift();
+  updateStats();
+}, 1000);
+
+// ---- Attack Generators ----
+
+function buildCharset() {
+  let cs = el('charsetInput').value || '';
+  return uniqChars(cs);
+}
+
+function expandMask(mask, charset) {
+  // mask placeholders: ?d ?l ?u ?s ?a ?c (custom)
+  // return an array of arrays (options per position)
+  const res = [];
+  for (let i=0;i<mask.length;i++){
+    const ch = mask[i];
+    if (ch==='?' && i+1<mask.length){
+      const code = mask[i+1]; i++;
+      if (code==='d') res.push('0123456789'.split(''));
+      else if (code==='l') res.push('abcdefghijklmnopqrstuvwxyz'.split(''));
+      else if (code==='u') res.push('ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''));
+      else if (code==='s') res.push('!@#$%^&*()-_=+[]{};:,.<>?'.split(''));
+      else if (code==='a') res.push((('0123456789'+'abcdefghijklmnopqrstuvwxyz'+'ABCDEFGHIJKLMNOPQRSTUVWXYZ'+'!@#$%^&*()-_=+[]{};:,.<>?')).split(''));
+      else if (code==='c') res.push(charset.split(''));
+      else res.push([code]); // treat literal unknown code as char
+    } else {
+      res.push([ch]);
+    }
+  }
+  return res;
+}
+
+// generator: odometer iterative
+function indexToCandidate(index, radixes, charArrays){
+  // radixes = array of sizes per position
+  let out='';
+  for (let pos = radixes.length-1; pos>=0; pos--){
+    const base = radixes[pos];
+    const digit = index % base;
+    out = charArrays[pos][digit] + out;
+    index = Math.floor(index / base);
+  }
+  return out;
+}
+
+// main attack driver (cooperative, non-blocking)
+let attackController = null;
+
+function startAttack(){
+  if (running) { log('[warn] Already running'); return; }
+  // gather settings
+  const mode = el('attackMode').value;
+  modeLabel.innerText = mode;
+  el('mainProg').style.width = '0%';
+  attempts = 0; startTs = Date.now(); lastUpdate = Date.now();
+  rateSamples = [];
+  foundBox.innerText = 'Status: RUNNING';
+  running = true; paused = false;
+  attackController = { stop:false, paused:false };
+
+  // voice cue
+  if (voiceEnabled){
+    speak('Initializing attack sequence. Mode ' + mode, {cancelQueue:true, rate:1});
+  }
+
+  // initialize mirror toggles
+  mirrorAttempts = el('mirrorAttempts').checked;
+  mirrorFound = el('mirrorFound').checked;
+
+  // stopAfter & delay
+  stopAfter = parseInt(el('stopAfter').value) || 0;
+  attemptDelay = parseInt(el('delayMs').value) || 2;
+
+  // choose engine
+  (async ()=>{
+    try {
+      if (mode==='brute'){
+        await engineBrute(attackController);
+      } else if (mode==='mask'){
+        await engineMask(attackController);
+      } else if (mode==='dict'){
+        await engineDict(attackController);
+      } else if (mode==='hybrid'){
+        await engineHybrid(attackController);
+      } else if (mode==='hash'){
+        await engineHash(attackController);
+      }
+      if (!attackController.stop){
+        log('[done] Attack finished.');
+        foundBox.innerText = 'Status: FINISHED';
+        if (voiceEnabled) speak('Attack finished', {force:true});
+      }
+    } catch(e){
+      log('[error] ' + e);
+    } finally {
+      running=false;
+    }
+  })();
+}
+
+function stopAttack(){
+  if (attackController) attackController.stop = true;
+  running = false; paused = false;
+  log('[action] Stop requested');
+  foundBox.innerText = 'Status: STOPPED';
+  // do not announce stop via voice (keep voice minimal)
+}
+
+function pauseAttack(){
+  if (!running) return;
+  attackController.paused = !attackController.paused;
+  paused = attackController.paused;
+  log('[action] ' + (paused? 'Paused':'Resumed'));
+  foundBox.innerText = paused? 'Status: PAUSED':'Status: RUNNING';
+  // do not announce pause/resume via voice
+}
+
+/* engine: brute force over charset and length */
+async function engineBrute(ctrl){
+  const charset = buildCharset();
+  if (!charset || charset.length<1){ log('[error] Provide charset for brute force'); return; }
+  const minL = parseInt(el('minLen').value) || 1;
+  const maxL = parseInt(el('maxLen').value) || 4;
+  let found=false;
+  let totalComb=0;
+  for (let L=minL; L<=maxL; L++) totalComb += Math.pow(charset.length, L);
+  let tried=0;
+  for (let L=minL; L<=maxL && !ctrl.stop; L++){
+    const radixes = Array.from({length:L}, ()=>charset.length);
+    const charArrays = Array.from({length:L}, ()=>charset.split(''));
+    const combos = Math.pow(charset.length, L);
+    for (let idx=0; idx<combos; idx++){
+      while (ctrl.paused) await sleep(200);
+      if (ctrl.stop) break;
+      const cand = indexToCandidate(idx, radixes, charArrays);
+      tried++; attempts++;
+      if (attempts%50===0) updateProgress(tried, totalComb, cand);
+      await processCandidate(cand);
+      if (ctrl.stop) break;
+      if (stopAfter && attempts>=stopAfter){ ctrl.stop=true; break; }
+      await sleep(attemptDelay);
+    }
+  }
+}
+
+/* engine: mask attack */
+async function engineMask(ctrl){
+  const charset = buildCharset();
+  const mask = el('maskInput').value || '';
+  if (!mask) { log('[error] Mask required'); return; }
+  const positions = expandMask(mask, charset);
+  const radixes = positions.map(p=>p.length);
+  const charArrays = positions;
+  const total = radixes.reduce((a,b)=>a*b, 1);
+  for (let idx=0; idx<total && !ctrl.stop; idx++){
+    while (ctrl.paused) await sleep(200);
+    if (ctrl.stop) break;
+    const cand = indexToCandidate(idx, radixes, charArrays);
+    attempts++; if (attempts%40===0) updateProgress(idx+1, total, cand);
+    await processCandidate(cand);
+    if (stopAfter && attempts>=stopAfter){ ctrl.stop=true; break; }
+    await sleep(attemptDelay);
+  }
+}
+
+/* engine: dictionary */
+let dictList = [];
+async function engineDict(ctrl){
+  if (dictList.length===0){ log('[warn] Dictionary empty. Load a file or add words.'); return; }
+  const total = dictList.length;
+  for (let i=0;i<total && !ctrl.stop;i++){
+    while (ctrl.paused) await sleep(200);
+    const cand = dictList[i].trim();
+    attempts++; if (attempts%10===0) updateProgress(i+1, total, cand);
+    await processCandidate(cand);
+    if (stopAfter && attempts>=stopAfter){ ctrl.stop=true; break; }
+    await sleep(attemptDelay);
+  }
+}
+
+/* engine: hybrid (mask placeholders replaced by dictionary entries for a particular token) */
+async function engineHybrid(ctrl){
+  // simple hybrid: mask with token {w} will be replaced by each dict word
+  const mask = el('maskInput').value || '';
+  if (!mask.includes('{w}')) { log('[error] Hybrid mask must include {w} placeholder.'); return; }
+  if (dictList.length===0){ log('[error] No dictionary loaded for hybrid.'); return; }
+  const charset = buildCharset();
+  // For each word in dict, substitute and then expand any mask placeholders if exist
+  let total = dictList.length;
+  for (let i=0;i<dictList.length && !ctrl.stop;i++){
+    while (ctrl.paused) await sleep(200);
+    const substituted = mask.replace('{w}', dictList[i]);
+    // If substituted contains ? placeholders, expand via engineMask's logic
+    const positions = expandMask(substituted, charset);
+    const radixes = positions.map(p=>p.length);
+    const combos = radixes.reduce((a,b)=>a*b,1);
+    for (let idx=0; idx<combos && !ctrl.stop; idx++){
+      const cand = indexToCandidate(idx, radixes, positions);
+      attempts++; if (attempts%20===0) updateProgress(attempts, 'unknown', cand);
+      await processCandidate(cand);
+      if (stopAfter && attempts>=stopAfter){ ctrl.stop=true; break; }
+      await sleep(attemptDelay);
+    }
+  }
+}
+
+/* engine: hash cracking — tries candidates and compares hashes (md5/crc32) */
+async function engineHash(ctrl){
+  const type = el('hashType').value;
+  const target = el('targetHash').value.trim();
+  if (!target){ log('[error] Provide target hash or plaintext.'); return; }
+  // For demo, we'll attempt dictionary if loaded; else run brute over charset+length
+  if (dictList.length>0){
+    for (let i=0;i<dictList.length && !ctrl.stop;i++){
+      while (ctrl.paused) await sleep(200);
+      const cand = dictList[i].trim();
+      let h = (type==='md5')? md5(cand) : (type==='crc32')? crc32(cand).toString(16) : cand;
+      if (type==='crc32') h = h.toString(16);
+      if (type==='plain') {
+        if (cand === target){ announceFound(cand); ctrl.stop=true; break; }
+      } else {
+        if (h.toLowerCase() === target.toLowerCase()){ announceFound(cand); ctrl.stop=true; break; }
+      }
+      attempts++; if (attempts%10===0) updateProgress(i+1, dictList.length, cand);
+      await sleep(attemptDelay);
+    }
+  } else {
+    // fallback brute
+    await engineBrute(ctrl); // engineBrute will call processCandidate which checks hashes via processCandidate
+  }
+}
+
+// process candidate: checks hash/plain and handles found events
+async function processCandidate(candidate){
+  // show to terminal (throttle output)
+  if (attempts % 20 === 0) log('Trying: ' + candidate);
+  // mirror to Arduino if enabled
+  if (serialOpen && mirrorAttempts) serialSendLine('Trying: ' + candidate);
+  // occasional voice updates (throttled)
+  // remove periodic voice updates to avoid reading attempt numbers
+  // if hash mode, compute & compare
+  const ht = el('hashType').value;
+  const target = el('targetHash').value.trim();
+  if (ht !== 'plain' && target) {
+    let h = (ht==='md5')? md5(candidate) : crc32(candidate).toString(16);
+    if (h.toLowerCase() === target.toLowerCase()) {
+      announceFound(candidate);
+      if (serialOpen && mirrorFound) serialSendLine('PASSWORD FOUND: ' + candidate);
+      throw 'FOUND';
+    }
+  } else {
+    // For non-hash modes, optional: if user supplied a plain target for demo (targetHash used as plain), compare
+    if (el('targetHash').value && el('attackMode').value !== 'hash') {
+      const tgt = el('targetHash').value;
+      if (candidate === tgt) {
+        announceFound(candidate);
+        if (serialOpen && mirrorFound) serialSendLine('PASSWORD FOUND: ' + candidate);
+        throw 'FOUND';
+      }
+    }
+  }
+}
+
+// announce found (update UI)
+function announceFound(pwd){
+  log('[result] PASSWORD FOUND: ' + pwd);
+  foundBox.innerText = 'FOUND: ' + pwd;
+  mainProg.style.width = '100%';
+  el('eta').innerText = '0s';
+  playSuccess();
+  // keep password found visual/audio (playSuccess) but avoid extra voice to stay minimal
+  // stop everything
+  attackController.stop = true;
+}
+
+// progress updater
+function updateProgress(done, total, current){
+  if (total && typeof total==='number'){
+    const pct = Math.min(100, Math.round((done/total)*100));
+    mainProg.style.width = pct + '%';
+    el('eta').innerText = '—';
+  } else {
+    // unknown total — use heuristic
+    const pct = Math.min(99, Math.round((Math.log10(done+10)/6)*100));
+    mainProg.style.width = pct + '%';
+  }
+  el('statAttempts').innerText = attempts;
+  el('statSpeed').innerText = rateSamples.length? ((rateSamples.reduce((a,b)=>a+b,0)/rateSamples.length).toFixed(1)):0;
+  el('statElapsed').innerText = ((Date.now()-startTs)/1000).toFixed(1);
+  el('modeLabel').innerText = el('attackMode').value;
+}
+
+/* File handling for dictionary */
+el('dictFile').addEventListener('change', (e)=>{
+  const f = e.target.files[0];
+  if (!f) return;
+  el('fileName').innerText = f.name;
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    const text = ev.target.result;
+    dictList = text.split(/\r?\n/).map(r=>r.trim()).filter(Boolean);
+    log('[dict] Loaded ' + dictList.length + ' words');
+    // avoid announcing dictionary load via voice to keep voice minimal
+  };
+  reader.readAsText(f);
+});
+el('fileDrop').addEventListener('dragover', (e)=>{ e.preventDefault(); e.dataTransfer.dropEffect='copy'; });
+el('fileDrop').addEventListener('drop', (e)=>{
+  e.preventDefault();
+  const f = e.dataTransfer.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    const text = ev.target.result;
+    dictList = text.split(/\r?\n/).map(r=>r.trim()).filter(Boolean);
+    log('[dict] Loaded ' + dictList.length + ' words');
+    // avoid announcing dictionary load via voice to keep voice minimal
+  };
+  reader.readAsText(f);
+});
+
+// update filename when user drops file
+el('fileDrop').addEventListener('drop', (e)=>{ if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) el('fileName').innerText = e.dataTransfer.files[0].name; });
+
+/* Simple sounds */
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function playSuccess(){
+  try {
+    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+    o.type='sine'; o.frequency.value=880; o.connect(g); g.connect(audioCtx.destination);
+    g.gain.value=0.0001; const now=audioCtx.currentTime;
+    g.gain.exponentialRampToValueAtTime(0.16, now+0.02);
+    o.frequency.exponentialRampToValueAtTime(1320, now+0.18);
+    g.gain.exponentialRampToValueAtTime(0.0001, now+0.28);
+    o.start(now); o.stop(now+0.32);
+  } catch(e){}
+}
+
+// ---- Voice Assist (Web Speech) ----
+let voiceEnabled = false;
+let voiceLevel = 'minimal';
+const synth = (window.speechSynthesis || null);
+let selectedVoice = null;
+function populateVoices(){ if (!synth) return; const voices = synth.getVoices(); selectedVoice = voices.find(v=>v.lang && v.lang.startsWith('en')) || voices[0]; }
+if (synth){ populateVoices(); if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = populateVoices; }
+
+function speak(text, opts={}){
+  if (!synth) return;
+  if (!voiceEnabled && !opts.force) return;
+  try{
+    const u = new SpeechSynthesisUtterance(text);
+    if (selectedVoice) u.voice = selectedVoice;
+    u.rate = opts.rate || 1.0;
+    u.pitch = opts.pitch || 1.0;
+    u.volume = (opts.volume===0)?0: (opts.volume || 1.0);
+    // Cancel queued short chatter when verbose toggles to avoid backlog
+    if (opts.cancelQueue) synth.cancel();
+    synth.speak(u);
+  }catch(e){}
+}
+
+/* Wire UI buttons */
+el('startBtn').addEventListener('click', ()=>{
+  if (!running) { startTs = Date.now(); attempts = 0; attackController = {}; startAttack(); } else log('[warn] already running');
+});
+el('stopBtn').addEventListener('click', ()=> stopAttack());
+el('pauseBtn').addEventListener('click', ()=> pauseAttack());
+
+el('connectSerial').addEventListener('click', async ()=>{
+  if (!serialOpen) await serialOpenPort(); else await serialClosePort();
+});
+el('serialToggle').addEventListener('click', async ()=> {
+  if (!serialOpen) await serialOpenPort(); else await serialClosePort();
+});
+el('clearLog').addEventListener('click', ()=> { terminal.innerHTML=''; log('[system] cleared'); });
+el('exportLog').addEventListener('click', ()=>{
+  const lines = Array.from(terminal.querySelectorAll('.logline')).map(n=>n.innerText);
+  const blob = new Blob([lines.join('\n')], {type:'text/plain'});
+  const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='cracking_log.txt'; a.click(); URL.revokeObjectURL(a.href);
+});
+
+// presets in localStorage
+function savePreset(){
+  const p = {mode:el('attackMode').value, charset:el('charsetInput').value, mask:el('maskInput').value, minLen:el('minLen').value, maxLen:el('maxLen').value, delay:el('delayMs').value};
+  const name = prompt('Preset name:');
+  if (!name) return;
+  localStorage.setItem('preset_'+name, JSON.stringify(p));
+  populatePresets();
+}
+function loadPresetByName(name){
+  const raw = localStorage.getItem('preset_'+name); if(!raw) return;
+  const p = JSON.parse(raw);
+  el('attackMode').value = p.mode; el('charsetInput').value=p.charset; el('maskInput').value=p.mask; el('minLen').value = p.minLen; el('maxLen').value = p.maxLen; el('delayMs').value = p.delay;
+  log('[preset] Loaded ' + name);
+}
+function populatePresets(){
+  const sel = el('presetSelect'); sel.innerHTML = ''; for (let i=0;i<localStorage.length;i++){
+    const k = localStorage.key(i); if (!k.startsWith('preset_')) continue;
+    const name = k.slice(7);
+    const opt = document.createElement('option'); opt.value=name; opt.innerText=name; sel.appendChild(opt);
+  }
+}
+el('savePreset').addEventListener('click', savePreset);
+el('loadPreset').addEventListener('click', ()=> { const name = prompt('Preset name to load (exact):'); if (name) loadPresetByName(name); populatePresets(); });
+el('loadPresetBtn').addEventListener('click', ()=> { const v=el('presetSelect').value; if (v) loadPresetByName(v); });
+el('delPresetBtn').addEventListener('click', ()=> { const v=el('presetSelect').value; if (!v) return; if (confirm('Delete preset '+v+'?')) localStorage.removeItem('preset_'+v); populatePresets(); });
+
+el('addDigits').addEventListener('click', ()=> { el('charsetInput').value = uniqChars(el('charsetInput').value + '0123456789'); });
+el('addUpper').addEventListener('click', ()=> { el('charsetInput').value = uniqChars(el('charsetInput').value + 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'); });
+el('addLower').addEventListener('click', ()=> { el('charsetInput').value = uniqChars(el('charsetInput').value + 'abcdefghijklmnopqrstuvwxyz'); });
+el('addPunct').addEventListener('click', ()=> { el('charsetInput').value = uniqChars(el('charsetInput').value + '!@#$%^&*()-_=+[]{};:,.<>?'); });
+
+el('faster').addEventListener('click', ()=> { attemptDelay = Math.max(0, attemptDelay - 1); el('delayMs').value = attemptDelay; });
+el('slower').addEventListener('click', ()=> { attemptDelay = attemptDelay + 1; el('delayMs').value = attemptDelay; });
+
+populatePresets();
+
+// Voice UI wiring
+if (el('voiceToggle')){
+  // initialize from DOM
+  voiceEnabled = !!el('voiceToggle').checked;
+  voiceLevel = el('voiceLevel')? el('voiceLevel').value : 'minimal';
+  el('voiceToggle').addEventListener('change', ()=>{
+    voiceEnabled = !!el('voiceToggle').checked;
+    if (voiceEnabled) speak('Voice enabled', {force:true}); else speak('Voice disabled', {force:true});
+  });
+}
+if (el('voiceLevel')){
+  el('voiceLevel').addEventListener('change', ()=>{
+    voiceLevel = el('voiceLevel').value;
+    if (voiceEnabled) speak('Voice level ' + voiceLevel, {force:true});
+  });
+}
+
+// prevent page from going idle (so audio works)
+document.addEventListener('click', ()=> { if (audioCtx.state === 'suspended') audioCtx.resume(); }, {once:true});
+
+log('[system] Cracking Suite loaded. Configure and press START.');
+
+// End of main script
+</script>
+</body>
+</html>
